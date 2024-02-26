@@ -1,4 +1,0 @@
-os.shutterfly.com
-link.shutterfly.com
-trk.bc.shutterfly.com
-sflyperks.shutterfly.com

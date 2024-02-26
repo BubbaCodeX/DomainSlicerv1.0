@@ -36,11 +36,25 @@ func readHosts() []string {
 }
 
 func main() {
-
-	//createFiles()
+	printAsciiArt()
 	loadedHosts := readHosts()
-	//loadUncheckedHosts()
 	checkStatus(loadedHosts)
+}
+
+func printAsciiArt() {
+	fmt.Println(`
+	····································································································
+	:▓█████▄  ▒█████   ███▄ ▄███▓ ▄▄▄       ██▓ ███▄    █   ██████  ██▓     ██▓ ▄████▄ ▓█████  ██▀███  :
+	:▒██▀ ██▌▒██▒  ██▒▓██▒▀█▀ ██▒▒████▄    ▓██▒ ██ ▀█   █ ▒██    ▒ ▓██▒    ▓██▒▒██▀ ▀█ ▓█   ▀ ▓██ ▒ ██▒:
+	:░██   █▌▒██░  ██▒▓██    ▓██░▒██  ▀█▄  ▒██▒▓██  ▀█ ██▒░ ▓██▄   ▒██░    ▒██▒▒▓█    ▄▒███   ▓██ ░▄█ ▒:
+	:░▓█▄   ▌▒██   ██░▒██    ▒██ ░██▄▄▄▄██ ░██░▓██▒  ▐▌██▒  ▒   ██▒▒██░    ░██░▒▓▓▄ ▄██▒▓█  ▄ ▒██▀▀█▄  :
+	:░▒████▓ ░ ████▓▒░▒██▒   ░██▒ ▓█   ▓██▒░██░▒██░   ▓██░▒██████▒▒░██████▒░██░▒ ▓███▀ ░▒████▒░██▓ ▒██▒:
+	: ▒▒▓  ▒ ░ ▒░▒░▒░ ░ ▒░   ░  ░ ▒▒   ▓▒█░░▓  ░ ▒░   ▒ ▒ ▒ ▒▓▒ ▒ ░░ ▒░▓  ░░▓  ░ ░▒ ▒  ░░ ▒░ ░░ ▒▓ ░▒▓░:
+	: ░ ▒  ▒   ░ ▒ ▒░ ░  ░      ░  ▒   ▒▒ ░ ▒ ░░ ░░   ░ ▒░░ ░▒  ░ ░░ ░ ▒  ░ ▒ ░  ░  ▒   ░ ░  ░  ░▒ ░ ▒░:
+	: ░ ░  ░ ░ ░ ░ ▒  ░      ░     ░   ▒    ▒ ░   ░   ░ ░ ░  ░  ░    ░ ░    ▒ ░░          ░     ░░   ░ :
+	:   ░        ░ ░         ░         ░  ░ ░           ░       ░      ░  ░ ░  ░ ░        ░  ░   ░     :
+	: ░                                                                        ░            BubbaCode  :
+	····································································································`)
 }
 
 func checkStatus(hosts []string) {
@@ -50,7 +64,7 @@ func checkStatus(hosts []string) {
 
 	// Create an HTTP client with a timeout
 	client := &http.Client{
-		Timeout: 5 * time.Second, // Adjust the timeout duration as needed
+		Timeout: 10 * time.Second, // Adjust the timeout duration as needed
 	}
 
 	for _, host := range hosts {
@@ -62,7 +76,7 @@ func checkStatus(hosts []string) {
 			defer wg.Done()
 			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))
 			if err != nil {
-				log.Println(err.Error())
+				//Error logging for http requests disabled by default
 				return
 			}
 			defer resp.Body.Close()

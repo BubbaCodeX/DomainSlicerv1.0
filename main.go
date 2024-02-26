@@ -13,10 +13,16 @@ import (
 )
 
 func readHosts() []string {
+
+	filename := os.Args[1]
+	if (filename == "" || len(filename) == 0) || strings.Split(filename, ".")[1] != "txt" {
+		log.Fatal("Please provide a valid .txt file name")
+	}
+
 	if runtime.GOOS == "windows" {
-		data, err := os.ReadFile("uncheckedHosts.txt")
+		data, err := os.ReadFile(filename)
 		if err != nil {
-			panic("error reading uncheckedHosts.txt")
+			panic("error reading " + filename)
 		}
 		return strings.Split(string(data), "\r\n")
 	} else {
@@ -35,7 +41,6 @@ func main() {
 	checkStatus(loadedHosts)
 }
 
-// REUSABLE REQUEST
 func checkStatus(hosts []string) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -48,6 +53,9 @@ func checkStatus(hosts []string) {
 
 	for _, host := range hosts {
 		wg.Add(1)
+		if strings.Contains(host, "http://") || strings.Contains(host, "https://") {
+			host = strings.Split(host, "/")[2]
+		}
 		go func(host string) {
 			defer wg.Done()
 			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))

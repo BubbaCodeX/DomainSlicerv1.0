@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -137,20 +136,5 @@ func writeToFile(sorted map[string]string) {
 			}
 
 		}
-	}
-}
-
-func createFiles() {
-	statusCodes := []string{"200", "401", "403", "404", "500", "unknown"}
-	for _, code := range statusCodes {
-		file, err := os.Open(code + ".txt")
-		if errors.Is(err, os.ErrNotExist) {
-			createfile, err := os.Create(code + ".txt")
-			if err != nil {
-				log.Fatal(err)
-			}
-			createfile.Close()
-		}
-		file.Close()
 	}
 }

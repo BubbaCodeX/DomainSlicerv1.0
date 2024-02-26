@@ -26,9 +26,9 @@ func readHosts() []string {
 		}
 		return strings.Split(string(data), "\r\n")
 	} else {
-		data, err := os.ReadFile("uncheckedHosts.txt")
+		data, err := os.ReadFile(filename)
 		if err != nil {
-			panic("error reading uncheckedHosts.txt")
+			panic("error reading" + filename)
 		}
 		return strings.Split(string(data), "\n")
 	}

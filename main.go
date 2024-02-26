@@ -1,6 +1,5 @@
 package main
 
-//TODO: ADD A THREAD LIMITER TO THE PROGRAM TO STABILIZE THE RESULT OUTPUTS AND MINIMIZE RACE CONDITIONS
 import (
 	"fmt"
 	"log"
@@ -12,10 +11,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
-func readHosts() []string {
+const maxWorkers = 40 // Maximum number of concurrent workers
 
+func readHosts() []string {
 	args := os.Args
 	if len(args) != 2 {
 		log.Println("Please enter the correct number of arguments!")
@@ -31,22 +33,19 @@ func readHosts() []string {
 		return nil
 	}
 
+	var lineSeparator string
 	if runtime.GOOS == "windows" {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			log.Println("Error reading file:", err)
-			return nil
-		}
-		return strings.Split(string(data), "\r\n")
+		lineSeparator = "\r\n"
 	} else {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			log.Println("Error reading file:", err)
-			return nil
-		}
-		return strings.Split(string(data), "\n")
+		lineSeparator = "\n"
 	}
 
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		log.Println("Error reading file:", err)
+		return nil
+	}
+	return strings.Split(string(data), lineSeparator)
 }
 
 func main() {
@@ -57,7 +56,7 @@ func main() {
 
 func printAsciiArt() {
 	fmt.Println(`
-	····································································································
+	··································································································
 	:▓█████▄  ▒█████   ███▄ ▄███▓ ▄▄▄       ██▓ ███▄    █   ██████  ██▓     ██▓ ▄████▄ ▓█████  ██▀███  :
 	:▒██▀ ██▌▒██▒  ██▒▓██▒▀█▀ ██▒▒████▄    ▓██▒ ██ ▀█   █ ▒██    ▒ ▓██▒    ▓██▒▒██▀ ▀█ ▓█   ▀ ▓██ ▒ ██▒:
 	:░██   █▌▒██░  ██▒▓██    ▓██░▒██  ▀█▄  ▒██▒▓██  ▀█ ██▒░ ▓██▄   ▒██░    ▒██▒▒▓█    ▄▒███   ▓██ ░▄█ ▒:
@@ -68,7 +67,7 @@ func printAsciiArt() {
 	: ░ ░  ░ ░ ░ ░ ▒  ░      ░     ░   ▒    ▒ ░   ░   ░ ░ ░  ░  ░    ░ ░    ▒ ░░          ░     ░░   ░ :
 	:   ░        ░ ░         ░         ░  ░ ░           ░       ░      ░  ░ ░  ░ ░        ░  ░   ░     :
 	: ░                                                                        ░            BubbaCode  :
-	····································································································`)
+	······································································`)
 }
 
 func checkStatus(hosts []string) {
@@ -78,24 +77,36 @@ func checkStatus(hosts []string) {
 	fmt.Println("SCAN STARTED.....")
 	// Create an HTTP client with a timeout
 	client := &http.Client{
+
 		Timeout: 25 * time.Second, // Adjust the timeout duration as needed
 	}
+	// Create a channel to limit the number of concurrent workers
+	workerPool := make(chan struct{}, maxWorkers)
+
+	// Initialize progress bar
+	bar := progressbar.Default(int64(len(hosts)))
 
 	for _, host := range hosts {
+		// Wait for an available worker slot
+		workerPool <- struct{}{}
 		wg.Add(1)
 		go func(host string) {
-			defer wg.Done()
+			defer func() {
+				// Release the worker slot when done
+				<-workerPool
+				wg.Done()
+			}()
 			// Parse the URL to extract the hostname
 			parsedURL, err := url.Parse(host)
 			if err != nil {
-				//log.Printf("Error parsing URL: %v\n", err)
+				// Handle error
 				return
 			}
 			hostname := parsedURL.Hostname()
 			// Perform HTTP GET request using the hostname
 			resp, err := client.Get("http://" + hostname)
 			if err != nil {
-				//log.Printf("Error performing GET request to %s: %v\n", hostname, err)
+				// Handle error
 				return
 			}
 			defer resp.Body.Close()
@@ -103,10 +114,13 @@ func checkStatus(hosts []string) {
 			mu.Lock()
 			slice = append(slice, statusLine)
 			mu.Unlock()
+			// Increment progress bar
+			bar.Add(1)
 		}(host)
 	}
 
 	wg.Wait()
+	close(workerPool)
 	sortData(slice)
 }
 
@@ -137,7 +151,7 @@ func sortData(toSort []string) {
 	}
 
 	writeToFile(hosts)
-	//output results of scan
+	// Output results of the scan
 	for code, count := range statusCount {
 		fmt.Printf("%d domains have resolved to status code %s\n", count, code)
 	}
@@ -151,10 +165,8 @@ func writeToFile(sorted map[string]string) {
 			if err := os.WriteFile(filePath, []byte(value+"\n"), 0666); err != nil {
 				log.Printf("Error writing to file %s: %s\n", filePath, err)
 			} else {
-				//test file creation
-
+				// File write successful
 			}
-
 		}
 	}
 }

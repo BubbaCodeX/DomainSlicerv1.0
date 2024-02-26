@@ -7,36 +7,34 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
 func readHosts() []string {
-
-	filename, err := filepath.Abs(os.Args[1])
+	args := os.Args
+	if len(args) != 2 {
+		log.Println("Please enter the correct number of arguments!")
+		return nil
+	}
+	filename, err := filepath.Abs(args[1])
 	if err != nil {
-		log.Fatal("Please enter a valid path")
+		log.Println("Error getting absolute path:", err)
+		return nil
 	}
-	if (filename == "" || len(filename) == 0) || strings.Split(filename, ".")[1] != "txt" {
-		log.Fatal("Please provide a valid .txt file name")
+	if filename == "" || len(filename) == 0 || filepath.Ext(filename) != ".txt" {
+		log.Println("Please provide a valid .txt file name")
+		return nil
 	}
-
-	if runtime.GOOS == "windows" {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			panic("error reading " + filename)
-		}
-		return strings.Split(string(data), "\r\n")
-	} else {
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			panic("error reading" + filename)
-		}
-		return strings.Split(string(data), "\n")
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		log.Println("Error reading file:", err)
+		return nil
 	}
+	return strings.Split(string(data), "\n")
 }
+
 func main() {
 
 	//createFiles()

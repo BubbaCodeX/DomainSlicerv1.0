@@ -77,14 +77,19 @@ func checkStatus(hosts []string) {
 	fmt.Println("SCAN STARTED.....")
 	// Create an HTTP client with a timeout
 	client := &http.Client{
-
 		Timeout: 25 * time.Second, // Adjust the timeout duration as needed
 	}
-	// Create a channel to limit the number of concurrent workers
-	workerPool := make(chan struct{}, maxWorkers)
 
 	// Initialize progress bar
-	bar := progressbar.Default(int64(len(hosts)))
+	bar := progressbar.NewOptions(len(hosts),
+		progressbar.OptionSetWriter(os.Stderr),
+		progressbar.OptionClearOnFinish(),
+		progressbar.OptionShowCount(),
+		progressbar.OptionThrottle(65*time.Millisecond),
+	)
+
+	// Create a channel to limit the number of concurrent workers
+	workerPool := make(chan struct{}, maxWorkers)
 
 	for _, host := range hosts {
 		// Wait for an available worker slot
@@ -95,6 +100,8 @@ func checkStatus(hosts []string) {
 				// Release the worker slot when done
 				<-workerPool
 				wg.Done()
+				// Increment progress bar after each host is processed
+				bar.Add(1)
 			}()
 			// Parse the URL to extract the hostname
 			parsedURL, err := url.Parse(host)
@@ -114,8 +121,6 @@ func checkStatus(hosts []string) {
 			mu.Lock()
 			slice = append(slice, statusLine)
 			mu.Unlock()
-			// Increment progress bar
-			bar.Add(1)
 		}(host)
 	}
 
@@ -150,12 +155,12 @@ func sortData(toSort []string) {
 		}
 	}
 
-	writeToFile(hosts)
 	// Output results of the scan
 	for code, count := range statusCount {
 		fmt.Printf("%d domains have resolved to status code %s\n", count, code)
 	}
 	fmt.Println("You can find the results of the scan in the this directory")
+	writeToFile(hosts)
 }
 
 func writeToFile(sorted map[string]string) {

@@ -6,21 +6,29 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
 func readHosts() []string {
-	data, err := os.ReadFile("uncheckedHosts.txt")
-	if err != nil {
-		panic("error reading uncheckedHosts.txt")
+	if runtime.GOOS == "windows" {
+		data, err := os.ReadFile("uncheckedHosts.txt")
+		if err != nil {
+			panic("error reading uncheckedHosts.txt")
+		}
+		return strings.Split(string(data), "\r\n")
+	} else {
+		data, err := os.ReadFile("uncheckedHosts.txt")
+		if err != nil {
+			panic("error reading uncheckedHosts.txt")
+		}
+		return strings.Split(string(data), "\n")
 	}
-	sliced := strings.Split(string(data), "\n")
-	return sliced
 }
-
 func main() {
+
 	//createFiles()
 	loadedHosts := readHosts()
 	//loadUncheckedHosts()

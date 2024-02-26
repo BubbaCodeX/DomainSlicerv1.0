@@ -6,12 +6,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
 func readHosts() []string {
+
+
 	args := os.Args
 	if len(args) != 2 {
 		log.Println("Please enter the correct number of arguments!")
@@ -26,12 +29,23 @@ func readHosts() []string {
 		log.Println("Please provide a valid .txt file name")
 		return nil
 	}
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		log.Println("Error reading file:", err)
-		return nil
+
+	if runtime.GOOS == "windows" {
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			log.Println("Error reading file:", err)
+			return nil
+		}
+		return strings.Split(string(data), "\r\n")
+	} else {
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			log.Println("Error reading file:", err)
+			return nil
+		}
+		return strings.Split(string(data), "\n")
 	}
-	return strings.Split(string(data), "\n")
+
 }
 
 func main() {
@@ -76,6 +90,7 @@ func checkStatus(hosts []string) {
 			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))
 			if err != nil {
 				//Error logging for http requests disabled by default
+				//log.Println(err)
 
 				return
 			}

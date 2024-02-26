@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -14,7 +15,10 @@ import (
 
 func readHosts() []string {
 
-	filename := os.Args[1]
+	filename, err := filepath.Abs(os.Args[1])
+	if err != nil {
+		log.Fatal("Please enter a valid path")
+	}
 	if (filename == "" || len(filename) == 0) || strings.Split(filename, ".")[1] != "txt" {
 		log.Fatal("Please provide a valid .txt file name")
 	}

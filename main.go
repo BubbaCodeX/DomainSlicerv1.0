@@ -1,16 +1,14 @@
 package main
 
-//TODO: Can't write to file every single request, too costly. Write to all files when all requests are done until we can find a more optimized way to do it.
-//TODO: Can we create a slice that we can just append the hosts with status codes attached to them? and maybe change the create file function to take this slice and create files based on the status codes that we have or maybe we
-// can keep what we have and just try that at some point if we have issues with memory.
 import (
-	//"bufio"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 func readHosts() []string {
@@ -18,8 +16,7 @@ func readHosts() []string {
 	if err != nil {
 		panic("error reading uncheckedHosts.txt")
 	}
-	sliced := strings.Split(string(data), "\r\n")
-	//log.Println(sliced[1])
+	sliced := strings.Split(string(data), "\n")
 	return sliced
 }
 
@@ -31,22 +28,34 @@ func main() {
 }
 
 // REUSABLE REQUEST
-func checkStatus(hosts []string) (slice []string) {
+func checkStatus(hosts []string) {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var slice []string
 
-	for i := 0; i < len(hosts); i++ {
-		resp, err := http.Get("http://" + strings.ReplaceAll(hosts[i], "\t", ""))
-		if err != nil {
-			log.Println(err.Error())
-			continue
-		}
-		defer resp.Body.Close()
-		//append to slice
-		//slice = append(slice, ("|"+fmt.Sprint(resp.StatusCode) + "|" + hosts[i]))
-		slice = append(slice, (fmt.Sprint(resp.StatusCode)+":"+hosts[i])+"\n")
+	// Create an HTTP client with a timeout
+	client := &http.Client{
+		Timeout: 5 * time.Second, // Adjust the timeout duration as needed
 	}
 
+	for _, host := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer wg.Done()
+			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			defer resp.Body.Close()
+			mu.Lock()
+			defer mu.Unlock()
+			slice = append(slice, fmt.Sprintf("%d:%s\n", resp.StatusCode, host))
+		}(host)
+	}
+
+	wg.Wait()
 	sortData(slice)
-	return slice
 }
 
 func sortData(toSort []string) {
@@ -62,9 +71,9 @@ func sortData(toSort []string) {
 	for i := 0; i < len(toSort); i++ {
 		switch strings.Split(toSort[i], ":")[0] {
 		case "200":
-			hosts["200"] = (hosts["200"] + strings.Split(toSort[i], ":")[1] )
+			hosts["200"] = (hosts["200"] + strings.Split(toSort[i], ":")[1])
 		case "400":
-			hosts["400"] = (hosts["400"] + strings.Split(toSort[i], ":")[1] )
+			hosts["400"] = (hosts["400"] + strings.Split(toSort[i], ":")[1])
 		case "401":
 			hosts["401"] = (hosts["401"] + strings.Split(toSort[i], ":")[1])
 		case "403":
@@ -74,28 +83,22 @@ func sortData(toSort []string) {
 		case "500":
 			hosts["500"] = (hosts["500"] + strings.Split(toSort[i], ":")[1])
 		default:
-		    hosts["999"] = (hosts["999"] + strings.Split(toSort[i], ":")[1])
+			hosts["999"] = (hosts["999"] + strings.Split(toSort[i], ":")[1])
 		}
 	}
 	writeToFile(hosts)
-	/* for _, value := range hosts{
-		fmt.Println(value)
-	} */
 }
 
 func writeToFile(sorted map[string]string) {
-	for key,value := range sorted{
-	if len(value) !=0{
-		if err := os.WriteFile(key+"txt", []byte(value), 0666); err != nil {
-			log.Fatal(err)
+	for key, value := range sorted {
+		if len(value) != 0 {
+			filePath := key + ".txt"
+			if err := os.WriteFile(filePath, []byte(value), 0666); err != nil {
+				log.Printf("Error writing to file %s: %s\n", filePath, err)
+			} else {
+				fmt.Printf("File %s created successfully.\n", filePath)
+			}
 		}
-	}
-	 /* err := os.WriteFile(key+".txt", []byte(value), 0666)
-	 if err != os.ErrNotExist {
-		log.Println("file not found...creating file")
-		createFiles()
-		continue
-	 } */
 	}
 }
 
@@ -111,7 +114,5 @@ func createFiles() {
 			createfile.Close()
 		}
 		file.Close()
-
 	}
 }
-

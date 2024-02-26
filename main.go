@@ -1,9 +1,11 @@
 package main
 
+//TODO: ADD A THREAD LIMITER TO THE PROGRAM TO STABILIZE THE RESULT OUTPUTS AND MINIMIZE RACE CONDITIONS
 import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,7 +15,6 @@ import (
 )
 
 func readHosts() []string {
-
 
 	args := os.Args
 	if len(args) != 2 {
@@ -77,27 +78,31 @@ func checkStatus(hosts []string) {
 	fmt.Println("SCAN STARTED.....")
 	// Create an HTTP client with a timeout
 	client := &http.Client{
-		Timeout: 10 * time.Second, // Adjust the timeout duration as needed
+		Timeout: 25 * time.Second, // Adjust the timeout duration as needed
 	}
 
 	for _, host := range hosts {
 		wg.Add(1)
-		if strings.Contains(host, "http://") || strings.Contains(host, "https://") {
-			host = strings.Split(host, "/")[2]
-		}
 		go func(host string) {
 			defer wg.Done()
-			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))
+			// Parse the URL to extract the hostname
+			parsedURL, err := url.Parse(host)
 			if err != nil {
-				//Error logging for http requests disabled by default
-				//log.Println(err)
-
+				//log.Printf("Error parsing URL: %v\n", err)
+				return
+			}
+			hostname := parsedURL.Hostname()
+			// Perform HTTP GET request using the hostname
+			resp, err := client.Get("http://" + hostname)
+			if err != nil {
+				//log.Printf("Error performing GET request to %s: %v\n", hostname, err)
 				return
 			}
 			defer resp.Body.Close()
+			statusLine := fmt.Sprintf("%d:%s\n", resp.StatusCode, hostname)
 			mu.Lock()
-			defer mu.Unlock()
-			slice = append(slice, fmt.Sprintf("%d:%s\n", resp.StatusCode, host))
+			slice = append(slice, statusLine)
+			mu.Unlock()
 		}(host)
 	}
 
@@ -112,7 +117,7 @@ func sortData(toSort []string) {
 		"401": "",
 		"403": "",
 		"404": "",
-		"500": "",
+		"429": "",
 		"999": "",
 	}
 	statusCount := make(map[string]int) // Map to store count of each status code
@@ -122,7 +127,7 @@ func sortData(toSort []string) {
 		host := strings.Split(toSort[i], ":")[1]
 
 		switch statusCode {
-		case "200", "400", "401", "403", "404", "500", "999":
+		case "200", "400", "401", "403", "404", "429", "999":
 			hosts[statusCode] += host
 			statusCount[statusCode]++
 		default:
@@ -143,7 +148,7 @@ func writeToFile(sorted map[string]string) {
 	for key, value := range sorted {
 		if len(value) != 0 {
 			filePath := key + ".txt"
-			if err := os.WriteFile(filePath, []byte(value), 0666); err != nil {
+			if err := os.WriteFile(filePath, []byte(value+"\n"), 0666); err != nil {
 				log.Printf("Error writing to file %s: %s\n", filePath, err)
 			} else {
 				//test file creation

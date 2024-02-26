@@ -61,7 +61,7 @@ func checkStatus(hosts []string) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var slice []string
-
+	fmt.Println("SCAN STARTED.....")
 	// Create an HTTP client with a timeout
 	client := &http.Client{
 		Timeout: 10 * time.Second, // Adjust the timeout duration as needed
@@ -77,6 +77,7 @@ func checkStatus(hosts []string) {
 			resp, err := client.Get("http://" + strings.ReplaceAll(host, "\t", ""))
 			if err != nil {
 				//Error logging for http requests disabled by default
+
 				return
 			}
 			defer resp.Body.Close()
@@ -100,25 +101,28 @@ func sortData(toSort []string) {
 		"500": "",
 		"999": "",
 	}
+	statusCount := make(map[string]int) // Map to store count of each status code
+
 	for i := 0; i < len(toSort); i++ {
-		switch strings.Split(toSort[i], ":")[0] {
-		case "200":
-			hosts["200"] = (hosts["200"] + strings.Split(toSort[i], ":")[1])
-		case "400":
-			hosts["400"] = (hosts["400"] + strings.Split(toSort[i], ":")[1])
-		case "401":
-			hosts["401"] = (hosts["401"] + strings.Split(toSort[i], ":")[1])
-		case "403":
-			hosts["403"] = (hosts["403"] + strings.Split(toSort[i], ":")[1])
-		case "404":
-			hosts["404"] = (hosts["404"] + strings.Split(toSort[i], ":")[1])
-		case "500":
-			hosts["500"] = (hosts["500"] + strings.Split(toSort[i], ":")[1])
+		statusCode := strings.Split(toSort[i], ":")[0]
+		host := strings.Split(toSort[i], ":")[1]
+
+		switch statusCode {
+		case "200", "400", "401", "403", "404", "500", "999":
+			hosts[statusCode] += host
+			statusCount[statusCode]++
 		default:
-			hosts["999"] = (hosts["999"] + strings.Split(toSort[i], ":")[1])
+			hosts["999"] += host
+			statusCount["999"]++
 		}
 	}
+
 	writeToFile(hosts)
+	//output results of scan
+	for code, count := range statusCount {
+		fmt.Printf("%d domains have resolved to status code %s\n", count, code)
+	}
+	fmt.Println("You can find the results of the scan in the this directory")
 }
 
 func writeToFile(sorted map[string]string) {
@@ -128,8 +132,10 @@ func writeToFile(sorted map[string]string) {
 			if err := os.WriteFile(filePath, []byte(value), 0666); err != nil {
 				log.Printf("Error writing to file %s: %s\n", filePath, err)
 			} else {
-				fmt.Printf("File %s created successfully.\n", filePath)
+				//test file creation
+
 			}
+
 		}
 	}
 }

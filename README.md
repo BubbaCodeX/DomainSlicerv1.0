@@ -1,5 +1,4 @@
 INSTALL:
-	git clone -u https://github.com/BubbaCodeX/DomainSlicerv1.1.gitINSTALL :
 	git clone -u https://github.com/BubbaCodeX/DomainSlicerv1.1.git
 COMMANDS :
 

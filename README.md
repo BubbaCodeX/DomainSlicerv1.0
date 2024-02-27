@@ -1,4 +1,5 @@
-
+INSTALL:
+	git clone 
 COMMANDS :
 
     Parse Command

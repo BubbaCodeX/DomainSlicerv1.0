@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE BubbaCodeX
+Copyright © 2024 BubbaCodeX
 */
 package main
 

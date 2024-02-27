@@ -1,3 +1,13 @@
+RUN:
+	
+    You can run the source file from the folder using the following command:
+    go run main.go <COMMAND> <FLAGS>
+    Or you can run the executable from command line using the following syntax:
+    DomainSlicer_V1.1 <COMMAND> <FLAGS>
+
+
+
+
 INSTALLATION:
 	
     

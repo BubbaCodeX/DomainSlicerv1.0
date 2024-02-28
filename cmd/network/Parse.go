@@ -70,16 +70,16 @@ var ParseCmd = &cobra.Command{
 						// Handle error
 						//fmt.Printf("Error sending request to host %s: %v\n", host, err)
 						//Increment progress bar
-						mutex.Lock() 
+						mutex.Lock()
 						bar.Add(1)
 						mutex.Unlock()
 					} else {
 						// Sort data
 						sortData(host, resp.StatusCode)
 						// Increment progress bar
-						mutex.Lock() 
+						mutex.Lock()
 						bar.Add(1)
-						mutex.Unlock() 
+						mutex.Unlock()
 					}
 				}
 			}()
@@ -194,7 +194,7 @@ func sortData(host string, statusCode int) {
 
 func printKeyOccurrences() {
 
-	fmt.Println("Occurrences of each key (status code) in sortedHosts:")
+	fmt.Println("\nOccurrences of each key (status code) in sortedHosts:")
 	for statusCode, hosts := range sortedHosts {
 		fmt.Printf("Status Code %d: %d Hosts found!\n", statusCode, len(hosts))
 	}

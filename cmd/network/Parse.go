@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TwiN/go-color"
+	"github.com/schollz/progressbar/v3" // Import the progressbar package
 	"github.com/spf13/cobra"
 )
 
@@ -33,20 +34,28 @@ var ParseCmd = &cobra.Command{
 		printAsciiArt()
 		fmt.Println("SCAN STARTED.....")
 		loadFile(handleHostFilePath(hostFilePath)) // load the list of hosts
+
+		// Initialize the progress bar
+		bar := progressbar.NewOptions(len(hosts),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionSetWidth(10),
+			progressbar.OptionSetDescription("[cyan]Processing"),
+			progressbar.OptionSetTheme(progressbar.Theme{
+				Saucer:        "=",
+				SaucerPadding: " ",
+				SaucerHead:    ">",
+
+				BarStart: "[",
+				BarEnd:   "]",
+			}))
+
 		// Create a channel to send tasks to workers
 		taskCh := make(chan string)
 
 		// Create a wait group to wait for all workers to finish
 		var wg sync.WaitGroup
 
-		// Progress bar variables
-		totalTasks := len(hosts)
-		progressCh := make(chan struct{}, totalTasks)
-
-		if numWorkers > totalTasks {
-			numWorkers = totalTasks // Limiting workers to total tasks
-			fmt.Println("Number of workers set to max")
-		} else if numWorkers < 1 {
+		if numWorkers < 1 {
 			numWorkers = 1 // Minimum of 1 worker
 			fmt.Println("Minimum of 1 worker set")
 		}
@@ -58,10 +67,19 @@ var ParseCmd = &cobra.Command{
 				defer wg.Done()
 				for host := range taskCh {
 					if resp, err := SendRequest(host); err != nil {
-						// DEBUGGING fmt.Printf("Error sending request to host %s: %v\n", host, err)
+						// Handle error
+						//fmt.Printf("Error sending request to host %s: %v\n", host, err)
+						//Increment progress bar
+						mutex.Lock() 
+						bar.Add(1)
+						mutex.Unlock()
 					} else {
+						// Sort data
 						sortData(host, resp.StatusCode)
-						progressCh <- struct{}{} // Signal task completion
+						// Increment progress bar
+						mutex.Lock() 
+						bar.Add(1)
+						mutex.Unlock() 
 					}
 				}
 			}()
@@ -69,31 +87,13 @@ var ParseCmd = &cobra.Command{
 
 		// Send tasks to workers
 		go func() {
-			defer close(taskCh)
 			for _, host := range hosts {
 				taskCh <- host
 			}
+			close(taskCh) // Close the task channel after sending all tasks
 		}()
 
 		// Wait for all tasks to complete
-		go func() {
-			wg.Wait()
-			close(progressCh)
-		}()
-
-		// Display progress
-		go func() {
-			ticker := time.NewTicker(100 * time.Millisecond) // Update progress every 100ms
-			defer ticker.Stop()
-
-			completed := 0
-			for range progressCh {
-				completed++
-				updateProgressBar(completed, totalTasks)
-			}
-		}()
-
-		// Wait for all workers to finish
 		wg.Wait()
 
 		printKeyOccurrences()
@@ -111,7 +111,7 @@ func init() {
 }
 
 func createClient(host string) (*http.Response, error) {
-	timeout := 20 * time.Second
+	timeout := 10 * time.Second
 	client := &http.Client{
 		Timeout: timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -254,12 +254,5 @@ func printAsciiArt() {
 	: ░ ░  ░ ░ ░ ░ ▒  ░      ░     ░   ▒    ▒ ░   ░   ░ ░ ░  ░  ░    ░ ░    ▒ ░░          ░     ░░   ░ :
 	:   ░        ░ ░         ░         ░  ░ ░           ░       ░      ░  ░ ░  ░ ░        ░  ░   ░     :
 	: ░                                                                        ░            BubbaCode  :
-	······································································..............................`))
-}
-func updateProgressBar(completed, total int) {
-	width := 50
-	progress := completed * width / total
-	remaining := width - progress
-	fmt.Printf("\r[%s%s] %d/%d hosts tested!", strings.Repeat("=", progress),
-		strings.Repeat(" ", remaining), completed, total)
+	····································································..............................`))
 }

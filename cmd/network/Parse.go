@@ -22,6 +22,8 @@ var (
 	numWorkers   int = 5
 	sortedHosts      = map[int][]string{}
 	mutex        sync.Mutex
+	scope_target string
+	countHosts   = map[string]int{}
 )
 
 // ParseCmd represents the Parse command
@@ -114,9 +116,6 @@ func createClient(host string) (*http.Response, error) {
 	timeout := 10 * time.Second
 	client := &http.Client{
 		Timeout: timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return nil
-		},
 	}
 
 	resp, err := client.Get("http://" + handleHostString(host))
@@ -188,7 +187,10 @@ func SendRequest(host string) (*http.Response, error) {
 func sortData(host string, statusCode int) {
 	mutex.Lock()
 	defer mutex.Unlock()
-
+	addHostOccurrences(
+		handleHostScope(host),
+		countHosts,
+	)
 	sortedHosts[statusCode] = append(sortedHosts[statusCode], host)
 }
 
@@ -203,12 +205,12 @@ func printKeyOccurrences() {
 func createFoldersAndFiles(sortedHosts map[int][]string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
-
+	scope_target = findKeyWithHighestCount(countHosts)
 	// Create a directory to store the files
-	directory := "./sorted_hosts"
+	directory := "./" + scope_target
 	err := os.Mkdir(directory, os.ModePerm)
-	if err != nil {
-		return err
+	if err != nil || err == os.ErrExist {
+		//fmt.Println("that directory already exists")
 	}
 
 	// Iterate over sortedHosts
@@ -216,30 +218,86 @@ func createFoldersAndFiles(sortedHosts map[int][]string) error {
 		// Create a folder for each status code
 		folderPath := filepath.Join(directory, fmt.Sprintf("%d", statusCode))
 		err := os.Mkdir(folderPath, os.ModePerm)
-		if err != nil {
-			return err
+		if err != nil || err == os.ErrExist {
+			//fmt.Println(folderPath)
 		}
+		//DEBUGGING FOR SCOPE TARGET ASSIGNMENT fmt.Println(scope_target)
 
 		// Create a text file inside the folder with the same name as the status code
-		filePath := filepath.Join(folderPath, fmt.Sprintf("%d.txt", statusCode))
-		file, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
+		filePath := filepath.Join(folderPath, fmt.Sprintf("%s-%d.txt", scope_target, statusCode))
 
-		// Write host names to the text file
-		for _, host := range hosts {
-			_, err := file.WriteString(host + "\n")
+		//fmt.Println("Created file: " + filePath)
+
+		file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err == os.ErrNotExist {
+			file, err = os.Create(filePath)
 			if err != nil {
 				return err
 			}
+
+		} else if err != nil {
+			return err
 		}
+
+		defer file.Close()
+
+		//TODO:  Add seperators in the file name to make it easier to read and tell you what scan resulsts are from what dates
+		// Write host names to the text file
+
+		file.WriteString("SCAN DATE: " + time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.UTC).Format("2006-01-02") + "\n")
+
+		for _, host := range hosts {
+			_, err := file.WriteString(host + "\n")
+			if err != nil {
+				fmt.Println(err)
+				return err
+			}
+
+		}
+		file.WriteString("-------------------------------------------------------------------------------------------------------------\n")
 	}
 	fmt.Println("Results have been written to the DomainSlicer directory!")
 	return nil
 }
 
+func findKeyWithHighestCount(data map[string]int) string {
+	var highestCount int
+	var keyWithHighestCount string
+
+	for key, count := range data {
+		if count > highestCount {
+			highestCount = count
+			keyWithHighestCount = key
+		}
+	}
+
+	return keyWithHighestCount
+}
+func handleHostScope(host string) string {
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://") // this shouldnt ever be needed but just in case
+	host = strings.TrimPrefix(host, "www.")     // this shouldnt ever be needed but just in case
+	host = strings.Split(host, ".com")[0]
+	if strings.Count(host, ".") > 0 {
+		host = strings.Split(host, ".")[strings.Count(host, ".")]
+		return host
+	}
+	return host
+}
+
+func addHostOccurrences(host string, hostMap map[string]int) {
+	// Normalize the host string to ensure consistency (e.g., case-insensitive)
+	host = strings.ToLower(host)
+
+	// Check if the host already exists in the map
+	if _, ok := hostMap[host]; ok {
+		// Increment the count if the host exists
+		hostMap[host]++
+	} else {
+		// Add the host to the map with an initial count of 1 if it doesn't exist
+		hostMap[host] = 1
+	}
+}
 func printAsciiArt() {
 
 	fmt.Println(color.InPurpleOverBlue(`
